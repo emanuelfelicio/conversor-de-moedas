@@ -48,3 +48,6 @@ Após a [Instalação](#instalação) e [Configuração](#configuração), você
 
 A aplicação irá apresentar um formulário interativo para que você insira a moeda de origem, a moeda de destino e o valor a ser convertido.
 
+<img width="677" height="321" alt="image" src="https://github.com/user-attachments/assets/011dc6b0-1406-4e9c-b63a-39d9bf22ee84" />
+
+
