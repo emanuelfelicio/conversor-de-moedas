@@ -1,16 +1,16 @@
 package ui
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/charmbracelet/huh"
 	"github.com/emanuelfelicio/conversor-de-moedas/internal/domain"
 )
 
-func RunForm() (domain.ConversionInput, error) {
-
-	var formData domain.ConversionInput
-	var amount string
+func RunForm() (*domain.ConversionInput, error) {
+	var fromCurrency domain.Currency
+	var toCurrency domain.Currency
+	var amountStr string
 	currencyOptions := domain.SupportedCurrency()
 
 	form := huh.NewForm(
@@ -18,29 +18,37 @@ func RunForm() (domain.ConversionInput, error) {
 			huh.NewSelect[domain.Currency]().
 				Title("Moeda de entrada").
 				Options(huh.NewOptions(currencyOptions...)...).
-				Value(&formData.From),
+				Value(&fromCurrency),
 
 			huh.NewSelect[domain.Currency]().
 				Title("Moeda de saída").
 				Options(
 					huh.NewOptions(currencyOptions...)...).
-				Value(&formData.To),
+				Value(&toCurrency),
 
 			huh.NewInput().
-				Title("Valor a converter").
-				Placeholder("Ex: 100.50").Value(&amount),
+				Title("Valor a converter").Prompt("?").
+				Placeholder("Ex: 100.50").Value(&amountStr),
 		),
-	)
+	).WithTheme(huh.ThemeDracula())
 
 	if err := form.Run(); err != nil {
-		return domain.ConversionInput{}, err
+		return nil, err
 	}
 
-	amountFloat, err := strconv.ParseFloat(amount, 64)
+	amount, err := domain.NewAmountFromString(amountStr)
 	if err != nil {
-		return domain.ConversionInput{}, err
+		return nil, err
 	}
 
-	formData.Amount = amountFloat
-	return formData, nil
+	input, err := domain.NewConversionInput(fromCurrency, toCurrency, amount)
+	if err != nil {
+		return nil, err
+	}
+
+	return input, nil
+}
+
+func PrintResult(r *domain.ConversionResult) {
+	fmt.Printf("%s %s -> %s %s\n", r.Input().Amount().String(), r.Input().From(), r.Amount().String(), r.Input().To())
 }

@@ -1,74 +1,102 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"math"
+	"slices"
+	"strconv"
+)
 
-type Currency string
+var (
+	ErrUnsupportedCurrency = errors.New("unsupported currency")
+	ErrAmountIsNegative    = errors.New("amount must be >= 0")
+	ErrInvalidRate         = errors.New("rate must be > 0")
+)
 
-var supported = map[Currency]struct{}{
-	"BRL": {},
-	"USD": {},
-	"EUR": {},
-	"CNY": {},
-	"JPY": {},
+// Amount is a Value Object representing a monetary value in cents.
+type Amount int64
+
+// NewAmountFromString creates an Amount from a string representation (e.g., "10.50").
+func NewAmountFromString(s string) (Amount, error) {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid amount format: %w", err)
+	}
+	cents := math.Round(f * 100)
+	return Amount(cents), nil
 }
 
+// String formats the Amount for display (e.g., 1050 -> "10.50").
+func (a Amount) String() string {
+	f := float64(a) / 100.0
+	return fmt.Sprintf("%.2f", f)
+}
+
+// Currency is a Value Object for currency codes.
+type Currency string
+
+var supported = []Currency{"BRL", "USD", "EUR"}
+
 func (c Currency) isSupported() bool {
-	_, ok := supported[c]
-	return ok
+	return slices.Contains(supported, c)
 }
 
 func SupportedCurrency() []Currency {
-	keys := make([]Currency, 0, len(supported))
-	for k := range supported {
-		keys = append(keys, k)
-	}
-	return keys
+	return supported
 }
 
+// ConversionInput encapsulates the input for a currency conversion.
 type ConversionInput struct {
-	From   Currency
-	To     Currency
-	Amount float64
+	from   Currency
+	to     Currency
+	amount Amount
 }
 
-func (in ConversionInput) Validate() error {
-	if !in.From.isSupported() {
-		return errors.New("unsupported source currency")
+// NewConversionInput creates a new ConversionInput
+func NewConversionInput(from, to Currency, amount Amount) (*ConversionInput, error) {
+	if !from.isSupported() {
+		return nil, ErrUnsupportedCurrency
 	}
-	if !in.To.isSupported() {
-		return errors.New("unsupported target currency")
+	if !to.isSupported() {
+		return nil, ErrUnsupportedCurrency
 	}
-	if in.Amount < 0 {
-		return errors.New("amount must be >= 0")
+	if amount < 0 {
+		return nil, ErrAmountIsNegative
 	}
-	return nil
+	return &ConversionInput{from: from, to: to, amount: amount}, nil
 }
 
+// Getters for ConversionInput fields.
+func (i *ConversionInput) From() Currency { return i.from }
+func (i *ConversionInput) To() Currency   { return i.to }
+func (i *ConversionInput) Amount() Amount { return i.amount }
+
+// ConversionResult encapsulates the result of a currency conversion.
 type ConversionResult struct {
-	From      Currency
-	To        Currency
-	Amount    float64
-	Rate      float64
-	Converted float64
+	input  *ConversionInput
+	rate   float64
+	amount Amount
 }
 
-func Convert(input ConversionInput, rate float64) (ConversionResult, error) {
+// Getters for ConversionResult fields.
+func (r *ConversionResult) Input() *ConversionInput { return r.input }
+func (r *ConversionResult) Rate() float64           { return r.rate }
+func (r *ConversionResult) Amount() Amount          { return r.amount }
 
-	if err := input.Validate(); err != nil {
-		return ConversionResult{}, err
-	}
-
+// Convert performs the currency conversion logic.
+func Convert(input *ConversionInput, rate float64) (*ConversionResult, error) {
 	if rate <= 0 {
-		return ConversionResult{}, errors.New("rate must be > 0")
+		return nil, ErrInvalidRate
 	}
 
-	converted := input.Amount * rate
+	convertedAmountInCents := float64(input.Amount()) * rate
+	roundedAmount := math.Round(convertedAmountInCents)
+	converted := Amount(roundedAmount)
 
-	return ConversionResult{
-		From:      input.From,
-		To:        input.To,
-		Amount:    input.Amount,
-		Rate:      rate,
-		Converted: converted,
+	return &ConversionResult{
+		input:  input,
+		rate:   rate,
+		amount: converted,
 	}, nil
 }
